@@ -13,7 +13,7 @@
 // O que NUNCA é guardado: os POST. Escrever precisa de rede, ponto. Fingir que
 // uma escrita passou quando não passou seria mentir-te sobre a tua Sheet.
 
-const VERSAO = "v2";
+const VERSAO = "v3";
 const CASCA = "casca-" + VERSAO;
 const DADOS = "dados-" + VERSAO;
 
@@ -131,22 +131,56 @@ self.addEventListener("fetch", (ev) => {
     return;
   }
 
-  // A casca: primeiro o arquivo (é sempre igual), e a rede por trás para a ir
-  // atualizando em silêncio.
-  if (url.origin === self.location.origin) {
+  if (url.origin !== self.location.origin) return;
+
+  // A PÁGINA: primeiro a rede, e o arquivo só se ela faltar.
+  //
+  // Isto começou ao contrário — arquivo primeiro, rede por trás a atualizar em
+  // silêncio — e o resultado era mau de uma maneira difícil de diagnosticar:
+  // depois de eu publicar uma versão nova, a primeira abertura da app servia
+  // na mesma a página velha, e a nova só aparecia à SEGUNDA. Deu-se o caso de
+  // uma secção nova existir no computador e não no telemóvel, e parecer um
+  // problema de tamanho de ecrã quando era só uma cópia em cache.
+  //
+  // Com a rede à frente, estando online tens sempre a última; estando offline
+  // tens a guardada, que é para isso que ela serve.
+  const ehPagina =
+    req.mode === "navigate" ||
+    (req.headers.get("accept") || "").indexOf("text/html") !== -1;
+
+  if (ehPagina) {
     ev.respondWith(
-      caches.match(req).then((guardado) => {
-        const daRede = fetch(req)
-          .then((res) => {
-            if (res && res.ok) {
-              const copia = res.clone();
-              caches.open(CASCA).then((c) => c.put(req, copia));
-            }
-            return res;
-          })
-          .catch(() => guardado);
-        return guardado || daRede;
-      }),
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copia = res.clone();
+            caches.open(CASCA).then((c) => c.put(req, copia));
+          }
+          return res;
+        })
+        .catch(function () {
+          return caches.match(req).then(function (guardado) {
+            return guardado || caches.match("./index.html");
+          });
+        }),
     );
+    return;
   }
+
+  // O resto da casca (ícones, manifesto) não muda quase nunca: arquivo
+  // primeiro, e a rede por trás a atualizá-lo em silêncio.
+  ev.respondWith(
+    caches.match(req).then((guardado) => {
+      const daRede = fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copia = res.clone();
+            caches.open(CASCA).then((c) => c.put(req, copia));
+          }
+          return res;
+        })
+        .catch(() => guardado);
+      return guardado || daRede;
+    }),
+  );
 });
