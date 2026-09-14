@@ -6,14 +6,6 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <link rel="icon" href="./icone-192.png" type="image/png" />
-    <!-- O iOS ignora o manifesto para isto: é por estas duas que a app abre
-         sem a barra do Safari e com a barra de estado do tom certo. -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Plataforma" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta
       name="theme-color"
       content="#f9f9f7"
@@ -1571,6 +1563,21 @@
         color: var(--cat-violet);
       }
 
+
+      /* Imobiliário. O preço é a coisa por que se lê uma lista de casas, por
+         isso a etiqueta é maior do que as outras e alinha à esquerda de tudo. */
+      .casa-badge {
+        background: var(--chip-green-bg, var(--chip-yellow-bg));
+        color: var(--cat-aqua, var(--cat-yellow));
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .casa-badge-sem {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px dashed var(--gridline);
+        font-weight: 500;
+      }
       .note-item {
         padding: 12px 16px;
         border-bottom: 1px solid var(--gridline);
@@ -2442,6 +2449,38 @@
             Nenhuma vaga nova. O agente procura uma vez por dia, às 9h: vagas
             remotas internacionais na RemoteOK e, se tiveres posto a chave da
             Adzuna, vagas de Lisboa e do Porto.
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="imobiliario-section">
+        <div class="section-head">
+          <h2>Imobiliário</h2>
+          <span class="count" id="imobiliario-status">o agente ainda não correu</span>
+        </div>
+        <div class="filter-row" id="imobiliario-filters">
+          <button class="filter-chip is-active" type="button" data-filter="todos" onclick="setImobiliarioFilter('todos')" aria-pressed="true">Todos <span class="n" id="if-todos">0</span></button>
+          <button class="filter-chip" type="button" data-filter="ate300" onclick="setImobiliarioFilter('ate300')" aria-pressed="false">até 300k <span class="n" id="if-ate300">0</span></button>
+          <button class="filter-chip" type="button" data-filter="mais300" onclick="setImobiliarioFilter('mais300')" aria-pressed="false">300k+ <span class="n" id="if-mais300">0</span></button>
+          <button class="filter-chip" type="button" data-filter="sempreco" onclick="setImobiliarioFilter('sempreco')" aria-pressed="false">sem preço <span class="n" id="if-sempreco">0</span></button>
+        </div>
+        <div class="card">
+          <div id="imobiliario-skeleton" class="skeleton-list">
+            <div class="skeleton-row">
+              <span class="sk sk-pill" style="margin-left: 0"></span>
+              <span class="sk sk-line w-60"></span>
+            </div>
+            <div class="skeleton-row">
+              <span class="sk sk-pill" style="margin-left: 0"></span>
+              <span class="sk sk-line w-40"></span>
+            </div>
+          </div>
+          <div id="imobiliario-list"></div>
+          <div id="imobiliario-empty" class="session-empty" style="display: none">
+            Nenhum anúncio ainda. Isto enche-se a partir das pesquisas que
+            guardares no idealista, no Imovirtual ou no Casa Sapo: eles mandam
+            os anúncios novos por email e o agente lê-os por ti — tu nunca abres
+            esse email, só vês os anúncios aqui.
           </div>
         </div>
       </div>
@@ -3741,8 +3780,7 @@
       // Anthropic. Sem isso preenchido, as notas ficam só nesta sessão do
       // browser (perdem-se ao recarregar) e usa-se o botão de copiar para o
       // Claude como alternativa.
-      const NOTES_API_URL =
-        "https://script.google.com/macros/s/AKfycbz2W4Toenbc-8p4g5T0xZJY96NZzyrP0wE2Kfocuc_mtKrhUgvG_pBZLUjbyK94SUEHiA/exec";
+      const NOTES_API_URL = "";
 
       // Chave de escrita. Tem de ser igual à do Apps Script (CHAVE_ESCRITA).
       // Ler só precisa do URL; escrever precisa também disto, que viaja no corpo
@@ -3842,12 +3880,7 @@
 
       async function pedirDados() {
         if (DENTRO_DO_APPS_SCRIPT) return chamarNoServidor("lerTudo");
-        const dados = await (await fetch(NOTES_API_URL)).json();
-        // O service worker carimba, dentro do próprio JSON, as respostas que
-        // vêm do arquivo em vez da rede. Sem isto, dados de ontem apareciam com
-        // ar de dados de agora.
-        mostrarArquivo(dados && dados._arquivo ? dados._arquivo.em : null);
-        return dados;
+        return (await fetch(NOTES_API_URL)).json();
       }
 
       async function enviar(payload) {
@@ -3910,6 +3943,7 @@
           "findings-skeleton",
           "week-skeleton",
           "candidaturas-skeleton",
+          "imobiliario-skeleton",
         ].forEach((id) => {
           const el = document.getElementById(id);
           if (el) el.style.display = ativo ? "" : "none";
@@ -3944,6 +3978,7 @@
           renderTodos();
           renderFindings();
           renderCandidaturas();
+          renderImobiliario();
           renderEmail();
           renderAgenda();
           renderVigia();
@@ -4010,6 +4045,7 @@
           renderTodos();
           renderFindings();
           renderCandidaturas();
+          renderImobiliario();
           renderEmail();
           renderAgenda();
           renderVigia();
@@ -4027,6 +4063,7 @@
           renderTodos();
           renderFindings();
           renderCandidaturas();
+          renderImobiliario();
           renderEmail();
           renderAgenda();
           renderVigia();
@@ -5207,7 +5244,9 @@
           return;
         }
 
-        const dosAgentes = sessionFindings.filter((f) => f.agent !== "email" && f.agent !== "candidaturas");
+        const dosAgentes = sessionFindings.filter(
+          (f) => f.agent !== "email" && f.agent !== "candidaturas" && f.agent !== "casas",
+        );
         // "por ver" aqui é só o que está neste painel; o cartão lá em cima
         // conta também o email e as candidaturas, e dizia 6 enquanto isto dizia 3
         status.textContent = dosAgentes.length
@@ -5327,6 +5366,7 @@
         sessionFindings = sessionFindings.filter((f) => f.id !== id);
         renderFindings();
         renderCandidaturas();
+        renderImobiliario();
         renderEmail();
         if (achado)
           showToast(
@@ -5954,6 +5994,131 @@
       }
 
 
+
+      // ------------------------------------------------------------------
+      // Imobiliário
+      // ------------------------------------------------------------------
+      // Secção própria, e não mais um monte nos "Achados dos agentes". Uma
+      // lista de casas lê-se pelo preço e compara-se entre si — misturada com
+      // avarias do metro e prazos fiscais não se consegue fazer nem uma coisa
+      // nem outra.
+      let imobiliarioFilter = "todos";
+
+      // Preços de casa sem cêntimos: "199 000 €" e não "199 000,00 €". Numa
+      // lista que se lê de relance, dois zeros por linha são ruído.
+      const eurRedondo = new Intl.NumberFormat("pt-PT", {
+        style: "currency",
+        currency: "EUR",
+        maximumFractionDigits: 0,
+      });
+
+      // O agente guarda o preço como número, não como texto, precisamente
+      // para isto: dá para o formatar bem E para o comparar. Uma casa sem
+      // preço legível fica com zero, que aqui quer dizer "não sei" — e por
+      // isso tem uma gaveta só dela em vez de ser atirada para o fundo.
+      function precoDaCasa(f) {
+        if (typeof f.value === "number") return f.value;
+        const n = Number(String(f.value || "").replace(/[^\d]/g, ""));
+        return isNaN(n) ? 0 : n;
+      }
+
+      function faixaDaCasa(f) {
+        const p = precoDaCasa(f);
+        if (!p) return "sempreco";
+        return p <= 300000 ? "ate300" : "mais300";
+      }
+
+      function setImobiliarioFilter(f) {
+        imobiliarioFilter = f;
+        document.querySelectorAll("#imobiliario-filters .filter-chip").forEach((c) => {
+          const ativo = c.getAttribute("data-filter") === f;
+          c.classList.toggle("is-active", ativo);
+          c.setAttribute("aria-pressed", ativo ? "true" : "false");
+        });
+        renderImobiliario();
+      }
+
+      function renderImobiliario() {
+        const list = document.getElementById("imobiliario-list");
+        const empty = document.getElementById("imobiliario-empty");
+        const status = document.getElementById("imobiliario-status");
+        if (!list) return;
+
+        const todos = sessionFindings
+          .filter((f) => f.agent === "casas")
+          .sort((a, b) => {
+            // mais barato primeiro; os sem preço no fim, porque exigem que
+            // abras o link para saberes seja o que for
+            const pa = precoDaCasa(a);
+            const pb = precoDaCasa(b);
+            if (!pa && !pb) return 0;
+            if (!pa) return 1;
+            if (!pb) return -1;
+            return pa - pb;
+          });
+
+        const counts = {
+          todos: todos.length,
+          ate300: todos.filter((f) => faixaDaCasa(f) === "ate300").length,
+          mais300: todos.filter((f) => faixaDaCasa(f) === "mais300").length,
+          sempreco: todos.filter((f) => faixaDaCasa(f) === "sempreco").length,
+        };
+        Object.keys(counts).forEach((k) => {
+          const el = document.getElementById("if-" + k);
+          if (el) el.textContent = counts[k];
+        });
+
+        if (!isSynced()) {
+          if (status) status.textContent = "precisa da sincronização com a Sheet";
+          list.innerHTML = "";
+          if (empty) {
+            empty.style.display = "block";
+            empty.textContent =
+              "O agente escreve na tua Google Sheet — esta secção só ganha vida depois da sincronização estar ligada.";
+          }
+          return;
+        }
+
+        if (status) {
+          status.textContent = todos.length
+            ? `${todos.length} ${todos.length === 1 ? "anúncio" : "anúncios"}`
+            : descreverCorrida("casas", "sem anúncios novos");
+        }
+
+        const visiveis =
+          imobiliarioFilter === "todos"
+            ? todos
+            : todos.filter((f) => faixaDaCasa(f) === imobiliarioFilter);
+
+        if (visiveis.length === 0) {
+          list.innerHTML = "";
+          if (empty) empty.style.display = "block";
+          return;
+        }
+        if (empty) empty.style.display = "none";
+
+        list.innerHTML = visiveis
+          .map((f) => {
+            const p = precoDaCasa(f);
+            const etiqueta = p ? eurRedondo.format(p) : "sem preço";
+            const cls = p ? "casa-badge" : "casa-badge casa-badge-sem";
+            const titulo = escHtml(String(f.title || ""));
+            const detalhe = escHtml(String(f.detail || ""));
+            const url = String(f.url || "").replace(/"/g, "&quot;");
+            return `
+      <div class="finding" data-finding-id="${f.id}">
+        <span class="finding-value ${cls}">${escHtml(etiqueta)}</span>
+        <div class="finding-body">
+          <p class="finding-title">${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${titulo}</a>` : titulo}</p>
+          <p class="finding-detail">${detalhe}</p>
+          <span class="finding-time">${f.time}</span>
+        </div>
+        <button class="dismiss-btn" type="button" aria-label="Dispensar este anúncio" title="Dispensar" onclick="dismissFinding('${f.id}')">×</button>
+      </div>`;
+          })
+          .join("");
+      }
+
       // ------------------------------------------------------------------
       // Formulários dobráveis no telemóvel
       // ------------------------------------------------------------------
@@ -6005,50 +6170,6 @@
       }
 
       prepararFormularios();
-
-      // ------------------------------------------------------------------
-      // App instalada: arquivo e service worker
-      // ------------------------------------------------------------------
-      // Quando não há rede, o service worker serve a última resposta que
-      // guardou. Isso é útil — mas só se souberes que é o que estás a ver.
-      let arquivoBarra = null;
-      function mostrarArquivo(guardadoEm) {
-        if (!arquivoBarra) {
-          arquivoBarra = document.createElement("div");
-          arquivoBarra.id = "barra-arquivo";
-          arquivoBarra.setAttribute("role", "status");
-          arquivoBarra.style.cssText =
-            "display:none;position:sticky;top:0;z-index:50;padding:10px 16px;" +
-            "font-size:13px;line-height:1.4;text-align:center;" +
-            "background:var(--cat-yellow,#8a6212);color:#fff;";
-          document.body.insertBefore(arquivoBarra, document.body.firstChild);
-        }
-        if (!guardadoEm) {
-          arquivoBarra.style.display = "none";
-          return;
-        }
-        const t = new Date(guardadoEm);
-        const quando = isNaN(t.getTime())
-          ? "não sei quando"
-          : t.toLocaleString("pt-PT", {
-              day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-            });
-        arquivoBarra.textContent =
-          "Sem ligação. Estás a ver o que foi guardado a " + quando +
-          " — o que escreveres agora não chega à tua Sheet.";
-        arquivoBarra.style.display = "block";
-      }
-
-      // O registo é deliberadamente à prova de falha: se o service worker não
-      // registar (browser antigo, página servida por http), a app continua a
-      // funcionar exatamente como o ficheiro solto — só perde o offline.
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("./sw.js").catch((e) => {
-            console.warn("service worker não registou:", e && e.message);
-          });
-        });
-      }
 
       loadNotes();
     </script>
