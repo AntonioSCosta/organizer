@@ -1138,8 +1138,15 @@
       .finding:last-child {
         border-bottom: none;
       }
+      /* Reserva sempre a mesma coluna, mesmo quando não há valor: numa lista
+         onde só algumas linhas têm etiqueta (candidaturas, achados), omitir o
+         <span> fazia o título dessas linhas começar mais à esquerda do que o
+         das outras — a lista lia-se em ziguezague em vez de em coluna. */
       .finding-value {
         flex-shrink: 0;
+        min-width: 80px;
+        box-sizing: border-box;
+        text-align: center;
         background: var(--chip-aqua-bg);
         color: var(--cat-aqua);
         border-radius: var(--r-pill);
@@ -1148,6 +1155,10 @@
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         margin-top: 1px;
+      }
+      .finding-value:empty {
+        background: transparent;
+        visibility: hidden;
       }
       .finding-body {
         flex: 1;
@@ -1640,12 +1651,22 @@
         display: flex;
         flex-direction: column;
       }
-      /* As duas colunas continuam a arrancar alinhadas, mas o cartão fica do
-         tamanho do que tem dentro. Esticá-lo enchia a Vigia de voos, que tem
-         duas linhas, com um retângulo vazio — e uma caixa vazia lê-se como
-         coisa partida, enquanto espaço em branco lê-se como espaço em branco. */
+      /* O cartão estica até à altura da coluna mais alta (Vigia de voos vs.
+         Do teu email; Notas vs. Novo evento aguentam sempre alturas muito
+         diferentes). Um retângulo vazio lia-se como coisa partida — por isso
+         o texto do estado vazio centra-se dentro do espaço esticado em vez
+         de ficar agarrado ao topo com uma sobra em branco por baixo. */
       .grid-2 > .section > .card:last-of-type {
-        flex: 0 0 auto;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .grid-2 > .section > .card:last-of-type > .session-empty {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
       }
       .grid-2.compacto {
         gap: 12px;
@@ -5289,7 +5310,7 @@
             const url = String(f.url || "").replace(/"/g, "&quot;");
             return `
       <div class="finding" data-finding-id="${f.id}">
-        ${valor ? `<span class="finding-value">${valor}</span>` : ""}
+        <span class="finding-value">${valor}</span>
         <div class="finding-body">
           <p class="finding-title">${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${titulo}</a>` : titulo}</p>
           <p class="finding-detail">${detalhe}</p>
@@ -5370,7 +5391,7 @@
           const url = String(f.url || "").replace(/"/g, "&quot;");
           return `
       <div class="finding" data-finding-id="${f.id}">
-        ${valor ? `<span class="finding-value ${badgeCls}">${escHtml(valor)}</span>` : ""}
+        <span class="finding-value ${valor ? badgeCls : ""}">${valor ? escHtml(valor) : ""}</span>
         <div class="finding-body">
           <p class="finding-title">${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${titulo}</a>` : titulo}</p>
           <p class="finding-detail">${detalhe}</p>
