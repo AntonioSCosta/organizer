@@ -1114,7 +1114,6 @@
       .watch-meta {
         font-size: 11.5px;
         color: var(--text-muted);
-        white-space: nowrap;
       }
       .watch-row a {
         color: var(--accent-strong);
@@ -1650,6 +1649,7 @@
         margin-bottom: 0;
         display: flex;
         flex-direction: column;
+        min-width: 0;
       }
       /* O cartão estica até à altura da coluna mais alta (Vigia de voos vs.
          Do teu email; Notas vs. Novo evento aguentam sempre alturas muito
@@ -1950,8 +1950,17 @@
         .form-actions > .btn-primary {
           flex: 1;
         }
+        /* Os dois links do rodapé não cabem lado a lado com o ponto entre eles
+           num ecrã estreito: o segundo link caía para a linha seguinte e o
+           ponto ficava pendurado sozinho no fim da primeira. O ponto passa a
+           quebra de linha (sem se ver) e cada link fica centrado na sua. */
+        footer span[aria-hidden="true"] {
+          display: block;
+          visibility: hidden;
+          height: 2px;
+        }
       }
-    
+
       /* ------------------------------------------------------------------
          TELEMÓVEL
          ------------------------------------------------------------------
